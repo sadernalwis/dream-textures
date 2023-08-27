@@ -1,6 +1,6 @@
 import numpy as np
 from .prompt_to_image import Optimizations, Scheduler, StepPreviewMode, _configure_model_padding
-from .detect_seamless import SeamlessAxes
+from ...api.models.seamless_axes import SeamlessAxes
 import random
 from dataclasses import dataclass
 from numpy.typing import NDArray
@@ -38,10 +38,7 @@ def upscale(
     import torch
     import diffusers
 
-    if optimizations.cpu_only:
-        device = "cpu"
-    else:
-        device = self.choose_device()
+    device = self.choose_device(optimizations)
 
     pipe = diffusers.StableDiffusionUpscalePipeline.from_pretrained(
         "stabilityai/stable-diffusion-x4-upscaler",
@@ -51,7 +48,7 @@ def upscale(
     pipe.scheduler = scheduler.create(pipe, None)
     # vae would automatically be made float32 within the pipeline, but it fails to convert after offloading is enabled
     pipe.vae.to(dtype=torch.float32)
-    if optimizations.can_use_cpu_offload(device) == "off":
+    if not optimizations.cpu_offloading(device):
         pipe = pipe.to(device)
     pipe = optimizations.apply(pipe, device)
 

@@ -8,7 +8,7 @@ import mathutils
 import numpy as np
 
 from .view_history import ImportPromptFile
-from ..property_groups.dream_prompt import pipeline_options
+from ..property_groups.dream_prompt import backend_options
 from .open_latest_version import OpenLatestVersion, is_force_show_download, new_version_available
 
 from ..ui.panels.dream_texture import advanced_panel, create_panel, prompt_panel, size_panel
@@ -17,8 +17,8 @@ from .notify_result import NotifyResult
 from ..preferences import StableDiffusionPreferences
 
 from ..generator_process import Generator
-from ..generator_process.models import Pipeline, FixItError
-from ..generator_process.actions.huggingface_hub import ModelType
+from ..generator_process.models import ModelType
+from ..api.models import FixItError
 import tempfile
 
 from ..engine.annotations.depth import render_depth_map
@@ -96,9 +96,8 @@ def dream_texture_projection_panels():
             elif new_version_available():
                 layout.operator(OpenLatestVersion.bl_idname, icon="IMPORT")
 
-            layout.prop(context.scene.dream_textures_project_prompt, "pipeline")
-            if Pipeline[context.scene.dream_textures_project_prompt.pipeline].model():
-                layout.prop(context.scene.dream_textures_project_prompt, 'model')
+            layout.prop(context.scene.dream_textures_project_prompt, "backend")
+            layout.prop(context.scene.dream_textures_project_prompt, 'model')
 
     yield DREAM_PT_dream_panel_projection
 
@@ -164,7 +163,7 @@ def dream_texture_projection_panels():
                     error_box.use_property_split = False
                     for i, line in enumerate(e.args[0].split('\n')):
                         error_box.label(text=line, icon="ERROR" if i == 0 else "NONE")
-                    e.draw(context, error_box)
+                    e._draw(context.scene.dream_textures_project_prompt, context, error_box)
                 except Exception as e:
                     print(e)
         return ActionsPanel
@@ -419,7 +418,7 @@ class ProjectDreamTexture(bpy.types.Operator):
         
         context.scene.dream_textures_info = "Starting..."
         if context.scene.dream_textures_project_use_control_net:
-            generated_args = context.scene.dream_textures_project_prompt.generate_args()
+            generated_args = context.scene.dream_textures_project_prompt.generate_args(context)
             del generated_args['control']
             future = gen.control_net(
                 control=[np.flipud(depth)], # the depth control needs to be flipped.
@@ -431,7 +430,7 @@ class ProjectDreamTexture(bpy.types.Operator):
             future = gen.depth_to_image(
                 depth=depth,
                 image=init_img_path,
-                **context.scene.dream_textures_project_prompt.generate_args()
+                **context.scene.dream_textures_project_prompt.generate_args(context)
             )
         gen._active_generation_future = future
         future.call_done_on_exception = False
